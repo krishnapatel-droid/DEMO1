@@ -1,44 +1,37 @@
+# Allow pipeline on all branches and manual trigger
+workflow:
+  rules:
+    - when: always
+
 stages:
   - build
   - test
+  - deploy
+  - review
+  - dast
+  - staging
+  - canary
+  - production
+  - incremental rollout 10%
+  - incremental rollout 25%
+  - incremental rollout 50%
+  - incremental rollout 100%
+  - performance
+  - cleanup
+  - secret-detection
 
+# Include Auto DevOps
+include:
+  - template: Auto-DevOps.gitlab-ci.yml
+
+# Variables
 variables:
-  NODE_VERSION: "20"
+  SECRET_DETECTION_ENABLED: "true"
 
-# Cache node_modules for faster builds
-cache:
-  key: ${CI_COMMIT_REF_SLUG}
-  paths:
-    - frontend/node_modules/
-    - backend/node_modules/
-
-# Build both frontend and backend
-build:
-  stage: build
-  image: node:${NODE_VERSION}
-  script:
-    - cd frontend
-    - npm ci
-    - npm run build
-    - cd ../backend
-    - npm ci
-    - npm run build
-  artifacts:
-    paths:
-      - frontend/dist/
-      - backend/dist/
-    expire_in: 1 hour
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-
-# Run tests (if you have any)
-test:
+# SAST Security Scan
+sast:
   stage: test
-  image: node:${NODE_VERSION}
-  script:
-    - cd frontend
-    - npm run lint
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+# Secret Detection
+secret_detection:
+  stage: secret-detection
