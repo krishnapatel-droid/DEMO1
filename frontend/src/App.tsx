@@ -96,8 +96,8 @@ function App() {
   return (
     <div className="app-shell">
       <header className="app-header">
-        <h1>Task Manager</h1>
-        <p className="app-subtitle">Simple CRUD app starter</p>
+        <h1>📋 My Tasks</h1>
+        <p className="app-subtitle">Manage your daily tasks efficiently</p>
       </header>
 
       <main className="app-main">
