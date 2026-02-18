@@ -75,7 +75,7 @@ function App() {
     try {
       await itemsApi.delete(id);
       fetchItems();
-    } catch (err) {
+    } catch {
       alert('Failed to delete item');
     }
   };
@@ -85,7 +85,7 @@ function App() {
       const newStatus = item.status === 'active' ? 'inactive' : 'active';
       await itemsApi.update(item.id, { status: newStatus });
       fetchItems();
-    } catch (err) {
+    } catch {
       alert('Failed to update status');
     }
   };
