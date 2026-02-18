@@ -134,7 +134,10 @@ deploy-production:
     name: production
     url: https://crud-app.com
   needs:
-    - deploy-staging
+    - job: push-backend
+      optional: true
+    - job: push-frontend
+      optional: true
   when: manual
   only:
     - main
