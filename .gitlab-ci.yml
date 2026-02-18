@@ -1,17 +1,82 @@
 stages:
-  - build
+  - lint
   - test
+  - build
   - deploy
+
+default:
+  tags: ["test"]
+  interruptible: true
+  retry:
+    max: 1
+    when:
+      - runner_system_failure
+      - stuck_or_timeout_failure
 
 variables:
   DOCKER_DRIVER: overlay2
   DOCKER_TLS_CERTDIR: "/certs"
   BACKEND_IMAGE: $CI_REGISTRY_IMAGE/backend:$CI_COMMIT_SHA
   FRONTEND_IMAGE: $CI_REGISTRY_IMAGE/frontend:$CI_COMMIT_SHA
+  NODE_VERSION: "20"
+
+lint-backend:
+  stage: lint
+  image: node:${NODE_VERSION}-alpine
+  before_script:
+    - cd backend
+    - npm ci
+  script:
+    - npm run lint
+  rules:
+    - if: '$CI_COMMIT_BRANCH'
+
+lint-frontend:
+  stage: lint
+  image: node:${NODE_VERSION}-alpine
+  before_script:
+    - cd frontend
+    - npm ci
+  script:
+    - npm run lint
+  rules:
+    - if: '$CI_COMMIT_BRANCH'
+
+test-backend:
+  stage: test
+  image: node:${NODE_VERSION}-alpine
+  before_script:
+    - cd backend
+    - npm ci
+  script:
+    - npm run test
+  rules:
+    - if: '$CI_COMMIT_BRANCH'
+
+test-frontend:
+  stage: test
+  image: node:${NODE_VERSION}-alpine
+  before_script:
+    - cd frontend
+    - npm ci
+  script:
+    - npm run test
+  rules:
+    - if: '$CI_COMMIT_BRANCH'
+
+security-scan:
+  stage: test
+  image: node:${NODE_VERSION}-alpine
+  script:
+    - cd backend && npm audit --audit-level=high || true
+    - cd ../frontend && npm audit --audit-level=high || true
+  allow_failure: true
+  rules:
+    - if: '$CI_COMMIT_BRANCH'
 
 build-backend:
   stage: build
-  image: node:20-alpine
+  image: node:${NODE_VERSION}-alpine
   before_script:
     - cd backend
     - npm ci
@@ -21,13 +86,12 @@ build-backend:
     paths:
       - backend/dist/
     expire_in: 1 hour
-  only:
-    - main
-    - develop
+  rules:
+    - if: '$CI_COMMIT_BRANCH'
 
 build-frontend:
   stage: build
-  image: node:20-alpine
+  image: node:${NODE_VERSION}-alpine
   before_script:
     - cd frontend
     - npm ci
@@ -37,50 +101,19 @@ build-frontend:
     paths:
       - frontend/dist/
     expire_in: 1 hour
-  only:
-    - main
-    - develop
-
-lint-backend:
-  stage: test
-  image: node:20-alpine
-  before_script:
-    - cd backend
-    - npm ci
-  script:
-    - npm run build
-  only:
-    - main
-    - develop
-
-lint-frontend:
-  stage: test
-  image: node:20-alpine
-  before_script:
-    - cd frontend
-    - npm ci
-  script:
-    - npm run lint
-  only:
-    - main
-    - develop
-
-security-scan:
-  stage: test
-  image: node:20-alpine
-  script:
-    - cd backend && npm audit --audit-level=high || true
-    - cd ../frontend && npm audit --audit-level=high || true
-  allow_failure: true
-  only:
-    - main
-    - develop
+  rules:
+    - if: '$CI_COMMIT_BRANCH'
 
 push-backend:
   stage: deploy
-  image: docker:24-dind
+  image: docker:24
   services:
-    - docker:24-dind
+    - name: docker:24-dind
+      alias: docker
+      command: ["--tls=false"]
+  variables:
+    DOCKER_HOST: tcp://docker:2375
+    DOCKER_TLS_CERTDIR: ""
   before_script:
     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
   script:
@@ -88,15 +121,19 @@ push-backend:
     - docker push $BACKEND_IMAGE
   needs:
     - build-backend
-  only:
-    - main
-    - develop
+  rules:
+    - if: '$CI_COMMIT_BRANCH'
 
 push-frontend:
   stage: deploy
-  image: docker:24-dind
+  image: docker:24
   services:
-    - docker:24-dind
+    - name: docker:24-dind
+      alias: docker
+      command: ["--tls=false"]
+  variables:
+    DOCKER_HOST: tcp://docker:2375
+    DOCKER_TLS_CERTDIR: ""
   before_script:
     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
   script:
@@ -104,9 +141,8 @@ push-frontend:
     - docker push $FRONTEND_IMAGE
   needs:
     - build-frontend
-  only:
-    - main
-    - develop
+  rules:
+    - if: '$CI_COMMIT_BRANCH'
 
 deploy-staging:
   stage: deploy
@@ -119,8 +155,8 @@ deploy-staging:
   needs:
     - push-backend
     - push-frontend
-  only:
-    - develop
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop"'
 
 deploy-production:
   stage: deploy
@@ -136,6 +172,5 @@ deploy-production:
     - job: push-frontend
       optional: true
   when: manual
-  only:
-  
-    - main
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
