@@ -1,4 +1,6 @@
-# Dependencies
+git remote add gitlab https://gitlab.com/your-username/your-repo.git
+git push gitlab maingit remote add gitlab https://gitlab.com/your-username/your-repo.git
+git push gitlab main# Dependencies
 node_modules/
 
 # Build outputs
