@@ -26,9 +26,8 @@ function App() {
       const result = await itemsApi.list({ q: search, sortBy, sortDir, page, pageSize });
       setItems(result.data);
       setTotal(result.meta.total);
-    } catch (err) {
+    } catch {
       setError('Failed to load items');
-      console.error(err);
     } finally {
       setLoading(false);
     }
@@ -66,7 +65,7 @@ function App() {
       }
       setShowModal(false);
       fetchItems();
-    } catch (err) {
+    } catch {
       alert('Failed to save item');
     }
   };
