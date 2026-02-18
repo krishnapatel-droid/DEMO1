@@ -1,10 +1,7 @@
 stages:
   - build
   - test
-  - security
-  - push
   - deploy
-  - production
 
 variables:
   DOCKER_DRIVER: overlay2
@@ -69,7 +66,7 @@ lint-frontend:
     - develop
 
 security-scan:
-  stage: security
+  stage: test
   image: node:20-alpine
   script:
     - cd backend && npm audit --audit-level=high || true
@@ -80,7 +77,7 @@ security-scan:
     - develop
 
 push-backend:
-  stage: push
+  stage: deploy
   image: docker:24-dind
   services:
     - docker:24-dind
@@ -96,7 +93,7 @@ push-backend:
     - develop
 
 push-frontend:
-  stage: push
+  stage: deploy
   image: docker:24-dind
   services:
     - docker:24-dind
@@ -126,7 +123,7 @@ deploy-staging:
     - develop
 
 deploy-production:
-  stage: production
+  stage: deploy
   image: alpine:latest
   script:
     - echo "Deploying to PRODUCTION"
