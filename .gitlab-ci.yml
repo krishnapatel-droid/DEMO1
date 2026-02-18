@@ -71,8 +71,6 @@ lint-frontend:
 security-scan:
   stage: security
   image: node:20-alpine
-  before_script:
-    - apk add --no-cache curl
   script:
     - cd backend && npm audit --audit-level=high || true
     - cd ../frontend && npm audit --audit-level=high || true
@@ -116,12 +114,8 @@ push-frontend:
 deploy-staging:
   stage: deploy
   image: alpine:latest
-  before_script:
-    - apk add --no-cache curl
   script:
-    - echo "Deploying to STAGING - Backend: $BACKEND_IMAGE"
-    - echo "Deploying to STAGING - Frontend: $FRONTEND_IMAGE"
-    - echo "STAGING deployment completed!"
+    - echo "Deploying to STAGING"
   environment:
     name: staging
     url: https://staging.crud-app.com
@@ -134,12 +128,8 @@ deploy-staging:
 deploy-production:
   stage: production
   image: alpine:latest
-  before_script:
-    - apk add --no-cache curl
   script:
-    - echo "Deploying to PRODUCTION - Backend: $BACKEND_IMAGE"
-    - echo "Deploying to PRODUCTION - Frontend: $FRONTEND_IMAGE"
-    - echo "PRODUCTION deployment completed!"
+    - echo "Deploying to PRODUCTION"
   environment:
     name: production
     url: https://crud-app.com
