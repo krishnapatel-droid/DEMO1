@@ -1,10 +1,14 @@
 stages:
   - lint
   - build
+  - docker
   - deploy
 
+# Use your EC2 runner
 default:
-  tags: ["test"]
+  tags:
+    - deploy
+    - ec2
   interruptible: true
   retry:
     max: 1
@@ -13,96 +17,80 @@ default:
       - stuck_or_timeout_failure
 
 variables:
+  NODE_VERSION: "18"
   DOCKER_DRIVER: overlay2
-  DOCKER_TLS_CERTDIR: "/certs"
+  DOCKER_TLS_CERTDIR: ""
   BACKEND_IMAGE: $CI_REGISTRY_IMAGE/backend:$CI_COMMIT_SHA
   FRONTEND_IMAGE: $CI_REGISTRY_IMAGE/frontend:$CI_COMMIT_SHA
-  NODE_VERSION: "20"
 
+# Run pipeline only on branches
+workflow:
+  rules:
+    - if: $CI_COMMIT_BRANCH
+
+# ---------------- LINT ----------------
 lint-frontend:
   stage: lint
   image: node:${NODE_VERSION}-alpine
-  before_script:
+  script:
     - cd frontend
     - npm ci
-  script:
     - npm run lint
-  rules:
-    - if: '$CI_COMMIT_BRANCH'
 
+# ---------------- BUILD ----------------
 build-backend:
   stage: build
   image: node:${NODE_VERSION}-alpine
-  before_script:
+  script:
     - cd backend
     - npm ci
-  script:
     - npm run build
   artifacts:
     paths:
-      - backend/dist/
-    expire_in: 1 hour
-  rules:
-    - if: '$CI_COMMIT_BRANCH'
+      - backend/dist
+    expire_in: 1h
 
 build-frontend:
   stage: build
   image: node:${NODE_VERSION}-alpine
-  before_script:
+  script:
     - cd frontend
     - npm ci
-  script:
     - npm run build
   artifacts:
     paths:
-      - frontend/dist/
-    expire_in: 1 hour
-  rules:
-    - if: '$CI_COMMIT_BRANCH'
+      - frontend/dist
+    expire_in: 1h
+
+# ---------------- DOCKER PUSH ----------------
+.docker_push_template:
+  stage: docker
+  image: docker:24
+  services:
+    - docker:24-dind
+  variables:
+    DOCKER_HOST: tcp://docker:2375
+  before_script:
+    - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" "$CI_REGISTRY"
 
 push-backend:
-  stage: deploy
-  image: docker:24
-  services:
-    - name: docker:24-dind
-      alias: docker
-      command: ["--tls=false"]
-  variables:
-    DOCKER_HOST: tcp://docker:2375
-    DOCKER_TLS_CERTDIR: ""
-  before_script:
-    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+  extends: .docker_push_template
   script:
-    - docker build -t $BACKEND_IMAGE ./backend
+    - docker build -t $BACKEND_IMAGE backend
     - docker push $BACKEND_IMAGE
-  needs:
-    - build-backend
-  rules:
-    - if: '$CI_COMMIT_BRANCH'
+  needs: ["build-backend"]
 
 push-frontend:
-  stage: deploy
-  image: docker:24
-  services:
-    - name: docker:24-dind
-      alias: docker
-      command: ["--tls=false"]
-  variables:
-    DOCKER_HOST: tcp://docker:2375
-    DOCKER_TLS_CERTDIR: ""
-  before_script:
-    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+  extends: .docker_push_template
   script:
-    - docker build -t $FRONTEND_IMAGE ./frontend
+    - docker build -t $FRONTEND_IMAGE frontend
     - docker push $FRONTEND_IMAGE
-  needs:
-    - build-frontend
-  rules:
-    - if: '$CI_COMMIT_BRANCH'
+  needs: ["build-frontend"]
 
+# ---------------- DEPLOY ----------------
 deploy-staging:
   stage: deploy
-  image: alpine:latest
+  image: alpine
   script:
     - echo "Deploying to STAGING"
   environment:
@@ -116,17 +104,15 @@ deploy-staging:
 
 deploy-production:
   stage: deploy
-  image: alpine:latest
+  image: alpine
   script:
     - echo "Deploying to PRODUCTION"
   environment:
     name: production
     url: https://crud-app.com
   needs:
-    - job: push-backend
-      optional: true
-    - job: push-frontend
-      optional: true
+    - push-backend
+    - push-frontend
   when: manual
   rules:
     - if: '$CI_COMMIT_BRANCH == "main"'
