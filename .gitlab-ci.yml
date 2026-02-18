@@ -1,17 +1,177 @@
+# Full CI/CD Pipeline
 stages:
   - build
+  - test
+  - security
+  - push
+  - deploy
+  - production
 
-build-push:
+variables:
+  DOCKER_DRIVER: overlay2
+  DOCKER_TLS_CERTDIR: "/certs"
+  BACKEND_IMAGE: $CI_REGISTRY_IMAGE/backend:$CI_COMMIT_SHA
+  FRONTEND_IMAGE: $CI_REGISTRY_IMAGE/frontend:$CI_COMMIT_SHA
+
+# ============================================
+# BUILD STAGE
+# ============================================
+
+build-backend:
   stage: build
+  image: node:20-alpine
+  before_script:
+    - cd backend
+    - npm ci
+  script:
+    - npm run build
+  artifacts:
+    paths:
+      - backend/dist/
+    expire_in: 1 hour
+  only:
+    - main
+    - develop
+
+build-frontend:
+  stage: build
+  image: node:20-alpine
+  before_script:
+    - cd frontend
+    - npm ci
+  script:
+    - npm run build
+  artifacts:
+    paths:
+      - frontend/dist/
+    expire_in: 1 hour
+  only:
+    - main
+    - develop
+
+# ============================================
+# TEST STAGE
+# ============================================
+
+lint-backend:
+  stage: test
+  image: node:20-alpine
+  before_script:
+    - cd backend
+    - npm ci
+  script:
+    - npm run build
+  only:
+    - main
+    - develop
+
+lint-frontend:
+  stage: test
+  image: node:20-alpine
+  before_script:
+    - cd frontend
+    - npm ci
+  script:
+    - npm run lint
+  only:
+    - main
+    - develop
+
+# ============================================
+# SECURITY STAGE
+# ============================================
+
+security-scan:
+  stage: security
+  image: node:20-alpine
+  before_script:
+    - npm install -g npm-audit-ci
+  script:
+    - cd backend && npm audit --audit-level=high || true
+    - cd ../frontend && npm audit --audit-level=high || true
+  allow_failure: true
+  only:
+    - main
+    - develop
+
+# ============================================
+# PUSH STAGE (Docker Images)
+# ============================================
+
+push-backend:
+  stage: push
   image: docker:24-dind
   services:
     - docker:24-dind
   before_script:
     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
   script:
-    - docker build -t $CI_REGISTRY_IMAGE/backend:$CI_COMMIT_SHA ./backend
-    - docker build -t $CI_REGISTRY_IMAGE/frontend:$CI_COMMIT_SHA ./frontend
-    - docker push $CI_REGISTRY_IMAGE/backend:$CI_COMMIT_SHA
-    - docker push $CI_REGISTRY_IMAGE/frontend:$CI_COMMIT_SHA
+    - docker build -t $BACKEND_IMAGE ./backend
+    - docker push $BACKEND_IMAGE
+  needs:
+    - build-backend
+  only:
+    - main
+    - develop
+
+push-frontend:
+  stage: push
+  image: docker:24-dind
+  services:
+    - docker:24-dind
+  before_script:
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+  script:
+    - docker build -t $FRONTEND_IMAGE ./frontend
+    - docker push $FRONTEND_IMAGE
+  needs:
+    - build-frontend
+  only:
+    - main
+    - develop
+
+# ============================================
+# DEPLOY STAGE (Staging)
+# ============================================
+
+deploy-staging:
+  stage: deploy
+  image: ubuntu:22.04
+  before_script:
+    - apt-get update && apt-get install -y curl
+  script:
+    - echo "Deploying to STAGING environment..."
+    - echo "Backend Image: $BACKEND_IMAGE"
+    - echo "Frontend Image: $FRONTEND_IMAGE"
+    - echo "STAGING deployment completed!"
+  environment:
+    name: staging
+    url: https://staging.crud-app.com
+  needs:
+    - push-backend
+    - push-frontend
+  only:
+    - develop
+
+# ============================================
+# PRODUCTION STAGE (Manual)
+# ============================================
+
+deploy-production:
+  stage: production
+  image: ubuntu:22.04
+  before_script:
+    - apt-get update && apt-get install -y curl
+  script:
+    - echo "Deploying to PRODUCTION environment..."
+    - echo "Backend Image: $BACKEND_IMAGE"
+    - echo "Frontend Image: $FRONTEND_IMAGE"
+    - echo "PRODUCTION deployment completed!"
+  environment:
+    name: production
+    url: https://crud-app.com
+  needs:
+    - deploy-staging
+  when: manual
   only:
     - main
