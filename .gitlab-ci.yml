@@ -1,7 +1,7 @@
 stages:
   - build
 
-build and push:
+build-push:
   stage: build
   image: docker:24-dind
   services:
@@ -15,4 +15,3 @@ build and push:
     - docker push $CI_REGISTRY_IMAGE/frontend:$CI_COMMIT_SHA
   only:
     - main
- If you need any modifications, please let me know.
