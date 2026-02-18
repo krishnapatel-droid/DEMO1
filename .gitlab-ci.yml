@@ -67,23 +67,26 @@ build-frontend:
   stage: docker
   image: docker:24
   services:
-    - docker:24-dind
+    - name: docker:24-dind
+      alias: docker
+      command: ["--tls=false"]
   variables:
     DOCKER_HOST: tcp://docker:2375
+    DOCKER_TLS_CERTDIR: ""
   before_script:
     - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" "$CI_REGISTRY"
 
 push-backend:
   extends: .docker_push_template
   script:
-    - docker build -t $BACKEND_IMAGE backend
+    - docker build -t $BACKEND_IMAGE ./backend
     - docker push $BACKEND_IMAGE
   needs: ["build-backend"]
 
 push-frontend:
   extends: .docker_push_template
   script:
-    - docker build -t $FRONTEND_IMAGE frontend
+    - docker build -t $FRONTEND_IMAGE ./frontend
     - docker push $FRONTEND_IMAGE
   needs: ["build-frontend"]
 
