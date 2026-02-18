@@ -1,4 +1,5 @@
-// Main Express server
+
+docker-compose version// Main Express server
 import express from 'express';
 import cors from 'cors';
 import { initDatabase, migrate, seed } from './db/schema.js';
@@ -9,12 +10,15 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 
 // Middleware
-app.use(cors({
-  origin: ['http://localhost:5173', 'http://127.0.0.1:5173'],
+const corsOptions = {
+  origin: process.env.NODE_ENV === 'production'
+    ? ['http://localhost', 'http://localhost:80']
+    : ['http://localhost:5173', 'http://127.0.0.1:5173'],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true,
-}));
+};
+app.use(cors(corsOptions));
 app.use(express.json());
 
 // Request logging

@@ -1,37 +1,3 @@
-# Allow pipeline on all branches and manual trigger
-workflow:
-  rules:
-    - when: always
+ If you need any modifications, please let me know.
 
-stages:
-  - build
-  - test
-  - deploy
-  - review
-  - dast
-  - staging
-  - canary
-  - production
-  - incremental rollout 10%
-  - incremental rollout 25%
-  - incremental rollout 50%
-  - incremental rollout 100%
-  - performance
-  - cleanup
-  - secret-detection
-
-# Include Auto DevOps
-include:
-  - template: Auto-DevOps.gitlab-ci.yml
-
-# Variables
-variables:
-  SECRET_DETECTION_ENABLED: "true"
-
-# SAST Security Scan
-sast:
-  stage: test
-
-# Secret Detection
-secret_detection:
-  stage: secret-detection
+Below is the modified version based on your requirements:
