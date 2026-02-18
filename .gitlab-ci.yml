@@ -72,15 +72,15 @@ build-frontend:
 push-backend:
   extends: .docker_push_template
   script:
-    - docker build -t $BACKEND_IMAGE ./backend
-    - docker push $BACKEND_IMAGE
+    - sudo docker build -t $BACKEND_IMAGE ./backend
+    - sudo docker push $BACKEND_IMAGE
   needs: ["build-backend"]
 
 push-frontend:
   extends: .docker_push_template
   script:
-    - docker build -t $FRONTEND_IMAGE ./frontend
-    - docker push $FRONTEND_IMAGE
+    - sudo docker build -t $FRONTEND_IMAGE ./frontend
+    - sudo docker push $FRONTEND_IMAGE
   needs: ["build-frontend"]
 
 # ---------------- DEPLOY ----------------
