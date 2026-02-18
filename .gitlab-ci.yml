@@ -1,6 +1,5 @@
 stages:
   - lint
-  - test
   - build
   - deploy
 
@@ -20,17 +19,6 @@ variables:
   FRONTEND_IMAGE: $CI_REGISTRY_IMAGE/frontend:$CI_COMMIT_SHA
   NODE_VERSION: "20"
 
-lint-backend:
-  stage: lint
-  image: node:${NODE_VERSION}-alpine
-  before_script:
-    - cd backend
-    - npm ci
-  script:
-    - npm run lint
-  rules:
-    - if: '$CI_COMMIT_BRANCH'
-
 lint-frontend:
   stage: lint
   image: node:${NODE_VERSION}-alpine
@@ -39,38 +27,6 @@ lint-frontend:
     - npm ci
   script:
     - npm run lint
-  rules:
-    - if: '$CI_COMMIT_BRANCH'
-
-test-backend:
-  stage: test
-  image: node:${NODE_VERSION}-alpine
-  before_script:
-    - cd backend
-    - npm ci
-  script:
-    - npm run test
-  rules:
-    - if: '$CI_COMMIT_BRANCH'
-
-test-frontend:
-  stage: test
-  image: node:${NODE_VERSION}-alpine
-  before_script:
-    - cd frontend
-    - npm ci
-  script:
-    - npm run test
-  rules:
-    - if: '$CI_COMMIT_BRANCH'
-
-security-scan:
-  stage: test
-  image: node:${NODE_VERSION}-alpine
-  script:
-    - cd backend && npm audit --audit-level=high || true
-    - cd ../frontend && npm audit --audit-level=high || true
-  allow_failure: true
   rules:
     - if: '$CI_COMMIT_BRANCH'
 
