@@ -1,5 +1,4 @@
-
-docker-compose version// Main Express server
+// Main Express server
 import express from 'express';
 import cors from 'cors';
 import { initDatabase, migrate, seed } from './db/schema.js';
