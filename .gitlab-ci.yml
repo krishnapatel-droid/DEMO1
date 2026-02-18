@@ -140,4 +140,5 @@ deploy-production:
       optional: true
   when: manual
   only:
+  
     - main
