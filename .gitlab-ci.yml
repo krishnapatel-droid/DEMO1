@@ -66,12 +66,32 @@ build-frontend:
 # Registry credentials: use GitLab CI/CD variables CI_REGISTRY_USER, CI_REGISTRY_PASSWORD, CI_REGISTRY (or set in Settings -> CI/CD -> Variables).
 docker-login:
   stage: docker
+  before_script:
+    # Docker Registry credentials verification
+    - echo 'Verifying Docker Registry credentials...'
+    - echo "Registry: $CI_REGISTRY"
+    - echo "Username: $CI_REGISTRY_USER"
+    # Verify credentials by testing docker login
+    - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" "$CI_REGISTRY" 2>&1 | tee /tmp/docker_login.log
+    - |
+      if grep -q "Login Succeeded" /tmp/docker_login.log; then
+        echo 'Docker login verified successfully'
+      else
+        echo 'Docker login failed'
+        cat /tmp/docker_login.log
+        exit 1
+      fi
   script:
     - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
 
 push-backend:
   stage: docker
   needs: ["build-backend"]
+  before_script:
+    # Verify Docker is running and registry is accessible
+    - echo 'Verifying Docker daemon...'
+    - docker version
+    - echo 'Building and pushing backend Docker image...'
   script:
     - docker build -t $BACKEND_IMAGE backend
     - docker push $BACKEND_IMAGE
@@ -79,6 +99,11 @@ push-backend:
 push-frontend:
   stage: docker
   needs: ["build-frontend"]
+  before_script:
+    # Verify Docker is running and registry is accessible
+    - echo 'Verifying Docker daemon...'
+    - docker version
+    - echo 'Building and pushing frontend Docker image...'
   script:
     - docker build -t $FRONTEND_IMAGE frontend
     - docker push $FRONTEND_IMAGE
