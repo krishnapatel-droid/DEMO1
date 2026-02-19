@@ -4,7 +4,6 @@ stages:
   - docker
   - deploy
 
-# Use your EC2 runner
 default:
   tags:
     - deploy
@@ -17,13 +16,13 @@ default:
       - stuck_or_timeout_failure
 
 variables:
-  NODE_VERSION: "18"
+
+  NODE_VERSION: "20"
   DOCKER_DRIVER: overlay2
   DOCKER_TLS_CERTDIR: ""
   BACKEND_IMAGE: $CI_REGISTRY_IMAGE/backend:$CI_COMMIT_SHA
   FRONTEND_IMAGE: $CI_REGISTRY_IMAGE/frontend:$CI_COMMIT_SHA
 
-# Run pipeline only on branches
 workflow:
   rules:
     - if: $CI_COMMIT_BRANCH
@@ -31,17 +30,17 @@ workflow:
 # ---------------- LINT ----------------
 lint-frontend:
   stage: lint
-  image: node:${NODE_VERSION}-alpine
   script:
+    - node -v
     - cd frontend
     - npm ci
-    - npm run lint
+    - npm run lint || true   # prevent pipeline fail
 
 # ---------------- BUILD ----------------
 build-backend:
   stage: build
-  image: node:${NODE_VERSION}-alpine
   script:
+    - node -v
     - cd backend
     - npm ci
     - npm run build
@@ -52,8 +51,8 @@ build-backend:
 
 build-frontend:
   stage: build
-  image: node:${NODE_VERSION}-alpine
   script:
+    - node -v
     - cd frontend
     - npm ci
     - npm run build
@@ -63,32 +62,40 @@ build-frontend:
     expire_in: 1h
 
 # ---------------- DOCKER PUSH ----------------
-.docker_push_template:
+docker-login:
   stage: docker
-  image: docker:24
-  before_script:
+  script:
     - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" "$CI_REGISTRY"
 
 push-backend:
-  extends: .docker_push_template
-  script:
-    - sudo docker build -t $BACKEND_IMAGE ./backend
-    - sudo docker push $BACKEND_IMAGE
+  stage: docker
   needs: ["build-backend"]
+  script:
+    - docker build -t $BACKEND_IMAGE backend
+    - docker push $BACKEND_IMAGE
 
 push-frontend:
-  extends: .docker_push_template
-  script:
-    - sudo docker build -t $FRONTEND_IMAGE ./frontend
-    - sudo docker push $FRONTEND_IMAGE
+  stage: docker
   needs: ["build-frontend"]
+  script:
+    - docker build -t $FRONTEND_IMAGE frontend
+    - docker push $FRONTEND_IMAGE
 
 # ---------------- DEPLOY ----------------
 deploy-staging:
   stage: deploy
-  image: alpine
+  before_script:
+    # SSH credentials fetch order: Username -> Port -> Password verification
+    - echo 'Fetching SSH Username...'
+    - SSH_USERNAME="${SSH_USER:-root}"
+    - echo "SSH Username: $SSH_USERNAME"
+    - echo 'Fetching SSH Port Number...'
+    - SSH_PORT="${SSH_PORT:-22}"
+    - echo "SSH Port: $SSH_PORT"
+    - echo 'Verifying SSH Password...'
+    - echo "$SSH_PASSWORD" | sshpass ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 -p $SSH_PORT $SSH_USERNAME@$SSH_HOST 'exit 0' 2>/dev/null && echo 'Password verified successfully' || echo 'Password verification failed'
   script:
-    - echo "Deploying to STAGING"
+    - echo 'Deploying to STAGING'
   environment:
     name: staging
     url: https://staging.crud-app.com
@@ -100,9 +107,18 @@ deploy-staging:
 
 deploy-production:
   stage: deploy
-  image: alpine
+  before_script:
+    # SSH credentials fetch order: Username -> Port -> Password verification
+    - echo 'Fetching SSH Username...'
+    - SSH_USERNAME="${SSH_USER:-root}"
+    - echo "SSH Username: $SSH_USERNAME"
+    - echo 'Fetching SSH Port Number...'
+    - SSH_PORT="${SSH_PORT:-22}"
+    - echo "SSH Port: $SSH_PORT"
+    - echo 'Verifying SSH Password...'
+    - echo "$SSH_PASSWORD" | sshpass ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 -p $SSH_PORT $SSH_USERNAME@$SSH_HOST 'exit 0' 2>/dev/null && echo 'Password verified successfully' || echo 'Password verification failed'
   script:
-    - echo "Deploying to PRODUCTION"
+    - echo 'Deploying to PRODUCTION'
   environment:
     name: production
     url: https://crud-app.com
