@@ -1,8 +1,6 @@
 stages:
   - lint
   - build
-  - docker
-  - deploy
 
 default:
   tags:
@@ -16,12 +14,7 @@ default:
       - stuck_or_timeout_failure
 
 variables:
-
   NODE_VERSION: "20"
-  DOCKER_DRIVER: overlay2
-  DOCKER_TLS_CERTDIR: ""
-  BACKEND_IMAGE: $CI_REGISTRY_IMAGE/backend:$CI_COMMIT_SHA
-  FRONTEND_IMAGE: $CI_REGISTRY_IMAGE/frontend:$CI_COMMIT_SHA
 
 workflow:
   rules:
@@ -34,7 +27,7 @@ lint-frontend:
     - node -v
     - cd frontend
     - npm ci
-    - npm run lint || true   # prevent pipeline fail
+    - npm run lint || true
 
 # ---------------- BUILD ----------------
 build-backend:
@@ -60,86 +53,3 @@ build-frontend:
     paths:
       - frontend/dist
     expire_in: 1h
-
-# ---------------- DOCKER PUSH ----------------
-# Runner must be able to run Docker without sudo (e.g. add gitlab-runner to docker group: usermod -aG docker gitlab-runner).
-# Registry credentials: use GitLab CI/CD variables CI_REGISTRY_USER, CI_REGISTRY_PASSWORD, CI_REGISTRY (or set in Settings -> CI/CD -> Variables).
-docker-login:
-  stage: docker
-  before_script:
-    - echo 'Verifying Docker Registry credentials...'
-    - echo "Registry: $CI_REGISTRY"
-    - echo "Username: $CI_REGISTRY_USER"
-    - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" "$CI_REGISTRY"
-  script:
-    - echo "Docker login successful, ready to push images"
-
-push-backend:
-  stage: docker
-  needs: ["build-backend"]
-  before_script:
-    - echo 'Verifying Docker daemon...'
-    - docker version
-  script:
-    - echo 'Building and pushing backend Docker image...'
-    - docker build -t $BACKEND_IMAGE backend
-    - docker push $BACKEND_IMAGE
-
-push-frontend:
-  stage: docker
-  needs: ["build-frontend"]
-  before_script:
-    - echo 'Verifying Docker daemon...'
-    - docker version
-  script:
-    - echo 'Building and pushing frontend Docker image...'
-    - docker build -t $FRONTEND_IMAGE frontend
-    - docker push $FRONTEND_IMAGE
-
-# ---------------- DEPLOY ----------------
-deploy-staging:
-  stage: deploy
-  before_script:
-    # SSH credentials fetch order: Username -> Port -> Password verification
-    - echo 'Fetching SSH Username...'
-    - SSH_USERNAME="${SSH_USER:-root}"
-    - echo "SSH Username: $SSH_USERNAME"
-    - echo 'Fetching SSH Port Number...'
-    - SSH_PORT="${SSH_PORT:-22}"
-    - echo "SSH Port: $SSH_PORT"
-    - echo 'Verifying SSH Password...'
-    - echo "$SSH_PASSWORD" | sshpass ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 -p $SSH_PORT $SSH_USERNAME@$SSH_HOST 'exit 0' 2>/dev/null && echo 'Password verified successfully' || echo 'Password verification failed'
-  script:
-    - echo 'Deploying to STAGING'
-  environment:
-    name: staging
-    url: https://staging.crud-app.com
-  needs:
-    - push-backend
-    - push-frontend
-  rules:
-    - if: '$CI_COMMIT_BRANCH == "develop"'
-
-deploy-production:
-  stage: deploy
-  before_script:
-    # SSH credentials fetch order: Username -> Port -> Password verification
-    - echo 'Fetching SSH Username...'
-    - SSH_USERNAME="${SSH_USER:-root}"
-    - echo "SSH Username: $SSH_USERNAME"
-    - echo 'Fetching SSH Port Number...'
-    - SSH_PORT="${SSH_PORT:-22}"
-    - echo "SSH Port: $SSH_PORT"
-    - echo 'Verifying SSH Password...'
-    - echo "$SSH_PASSWORD" | sshpass ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 -p $SSH_PORT $SSH_USERNAME@$SSH_HOST 'exit 0' 2>/dev/null && echo 'Password verified successfully' || echo 'Password verification failed'
-  script:
-    - echo 'Deploying to PRODUCTION'
-  environment:
-    name: production
-    url: https://crud-app.com
-  needs:
-    - push-backend
-    - push-frontend
-  when: manual
-  rules:
-    - if: '$CI_COMMIT_BRANCH == "main"'
